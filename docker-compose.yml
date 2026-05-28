@@ -1,0 +1,28 @@
+﻿version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: auto_wash_saas
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  api:
+    build: .
+    ports:
+      - "5000:5000"
+    depends_on:
+      - postgres
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/auto_wash_saas
+      JWT_SECRET: your-super-secret-jwt-key
+    volumes:
+      - ./logs:/app/logs
+
+volumes:
+  postgres_data:
