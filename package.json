@@ -15,10 +15,32 @@
     "db:seed": "node prisma/seed.js"
   },
   "devDependencies": {
+    "@prisma/client": "^5.22.0",
     "concurrently": "^8.2.2",
     "prisma": "^5.22.0"
   },
   "prisma": {
     "seed": "node prisma/seed.js"
+  },
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/longbai203-del/auto-wash-manager-saas.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/longbai203-del/auto-wash-manager-saas/issues"
+  },
+  "homepage": "https://github.com/longbai203-del/auto-wash-manager-saas#readme",
+  "description": "",
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "express-validator": "^7.3.2",
+    "jsonwebtoken": "^9.0.3"
   }
 }

@@ -1,5 +1,6 @@
 ﻿generator client {
   provider = "prisma-client-js"
+  output   = "./generated"
 }
 
 datasource db {
@@ -7,13 +8,50 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
+model Service {
   id        String   @id @default(cuid())
-  email     String   @unique
-  password  String
-  name      String
-  role      String   @default("STAFF")
-  status    String   @default("ACTIVE")
+  name      String   @unique
+  price     Float
+  duration  Int
+  category  String
+  isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+}
+
+model Customer {
+  id         String   @id @default(cuid())
+  name       String
+  phone      String   @unique
+  email      String?
+  totalSpent Float    @default(0)
+  visitCount Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model Order {
+  id          String   @id @default(cuid())
+  orderNumber String   @unique
+  customerId  String
+  subtotal    Float
+  vatAmount   Float
+  totalAmount Float
+  status      String   @default("pending")
+  notes       String?
+  createdAt   DateTime @default(now())
+  completedAt DateTime?
+
+  customer Customer @relation(fields: [customerId], references: [id])
+}
+
+model OrderItem {
+  id        String  @id @default(cuid())
+  orderId   String
+  serviceId String
+  quantity  Int
+  unitPrice Float
+  total     Float
+
+  order   Order   @relation(fields: [orderId], references: [id])
+  service Service @relation(fields: [serviceId], references: [id])
 }
