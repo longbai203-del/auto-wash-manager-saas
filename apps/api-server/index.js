@@ -1,4 +1,4 @@
-﻿const express = require('express');
+const express = require('express');
 const cors = require('cors');
 const { Pool } = require('pg');
 
@@ -226,3 +226,4 @@ app.use('/api/reports', reportRoutes);
 // VAT 报表
 const vatRoutes = require('./routes/vat');
 app.use('/api/vat', vatRoutes);
+
