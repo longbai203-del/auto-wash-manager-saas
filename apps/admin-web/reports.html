@@ -48,6 +48,11 @@
     <script>
         const API_BASE = 'https://auto-wash-api.onrender.com';
         
+        function formatNumber(val) {
+            if (val === undefined || val === null) return 0;
+            return parseFloat(val) || 0;
+        }
+        
         async function loadDaily() {
             const date = new Date().toISOString().split('T')[0];
             document.getElementById('reportContent').innerHTML = '<div class="loading">加载日报表...</div>';
@@ -57,18 +62,24 @@
                 if (!res.ok) throw new Error('API 请求失败');
                 const data = await res.json();
                 
+                const summary = data.summary || {};
+                const totalOrders = formatNumber(summary.total_orders);
+                const totalRevenue = formatNumber(summary.total_revenue);
+                const totalVat = formatNumber(summary.total_vat);
+                const avgOrder = formatNumber(summary.avg_order_value);
+                
                 document.getElementById('reportContent').innerHTML = `
                     <div class="stats-grid">
-                        <div class="stat-card"><h3>总订单</h3><div class="stat-value">${data.summary?.total_orders || 0}</div></div>
-                        <div class="stat-card"><h3>总收入</h3><div class="stat-value">¥${(data.summary?.total_revenue || 0).toFixed(2)}</div></div>
-                        <div class="stat-card"><h3>VAT (15%)</h3><div class="stat-value">¥${(data.summary?.total_vat || 0).toFixed(2)}</div></div>
-                        <div class="stat-card"><h3>平均订单</h3><div class="stat-value">¥${(data.summary?.avg_order_value || 0).toFixed(2)}</div></div>
+                        <div class="stat-card"><h3>总订单</h3><div class="stat-value">${totalOrders}</div></div>
+                        <div class="stat-card"><h3>总收入</h3><div class="stat-value">¥${totalRevenue.toFixed(2)}</div></div>
+                        <div class="stat-card"><h3>VAT (15%)</h3><div class="stat-value">¥${totalVat.toFixed(2)}</div></div>
+                        <div class="stat-card"><h3>平均订单</h3><div class="stat-value">¥${avgOrder.toFixed(2)}</div></div>
                     </div>
                     <div class="table-container">
                         <h3 style="margin-bottom:15px">📋 服务销售统计</h3>
                         ${data.services && data.services.length > 0 ? `
                         <table><thead><tr><th>服务名称</th><th>销售次数</th><th>收入</th></tr></thead><tbody>
-                            ${data.services.map(s => `<tr><td>${s.service_name}</td><td>${s.times_sold || 0}</td><td>¥${(s.revenue || 0).toFixed(2)}</td></tr>`).join('')}
+                            ${data.services.map(s => `<tr><td>${s.service_name}</td><td>${formatNumber(s.times_sold)}</td><td>¥${formatNumber(s.revenue).toFixed(2)}</td></tr>`).join('')}
                         </tbody></table>
                         ` : '<p style="text-align:center;color:#999;">暂无数据</p>'}
                     </div>
@@ -86,19 +97,25 @@
                 if (!res.ok) throw new Error('API 请求失败');
                 const data = await res.json();
                 
+                const summary = data.summary || {};
+                const totalInvoices = formatNumber(summary.total_invoices);
+                const totalNet = formatNumber(summary.total_net);
+                const totalVat = formatNumber(summary.total_vat);
+                const totalGross = formatNumber(summary.total_gross);
+                
                 document.getElementById('reportContent').innerHTML = `
                     <div class="stats-grid">
                         <div class="stat-card"><h3>VAT税率</h3><div class="stat-value">${data.vat_rate || 15}%</div></div>
-                        <div class="stat-card"><h3>总发票数</h3><div class="stat-value">${data.summary?.total_invoices || 0}</div></div>
-                        <div class="stat-card"><h3>净销售额</h3><div class="stat-value">¥${(data.summary?.total_net || 0).toFixed(2)}</div></div>
-                        <div class="stat-card"><h3>VAT金额</h3><div class="stat-value vat-highlight">¥${(data.summary?.total_vat || 0).toFixed(2)}</div></div>
-                        <div class="stat-card"><h3>含税总额</h3><div class="stat-value">¥${(data.summary?.total_gross || 0).toFixed(2)}</div></div>
+                        <div class="stat-card"><h3>总发票数</h3><div class="stat-value">${totalInvoices}</div></div>
+                        <div class="stat-card"><h3>净销售额</h3><div class="stat-value">¥${totalNet.toFixed(2)}</div></div>
+                        <div class="stat-card"><h3>VAT金额</h3><div class="stat-value vat-highlight">¥${totalVat.toFixed(2)}</div></div>
+                        <div class="stat-card"><h3>含税总额</h3><div class="stat-value">¥${totalGross.toFixed(2)}</div></div>
                     </div>
                     <div class="table-container">
                         <h3 style="margin-bottom:15px">📋 VAT日报表</h3>
                         ${data.daily && data.daily.length > 0 ? `
                         <table><thead><tr><th>日期</th><th>发票数</th><th>净销售额</th><th>VAT</th><th>含税总额</th></tr></thead><tbody>
-                            ${data.daily.map(d => `<tr><td>${d.date}</td><td>${d.invoice_count}</td><td>¥${(d.total_net || 0).toFixed(2)}</td><td class="vat-highlight">¥${(d.total_vat || 0).toFixed(2)}</td><td>¥${(d.total_gross || 0).toFixed(2)}</td></tr>`).join('')}
+                            ${data.daily.map(d => `<tr><td>${d.date ? d.date.split('T')[0] : ''}</td><td>${formatNumber(d.invoice_count)}</td><td>¥${formatNumber(d.total_net).toFixed(2)}</td><td class="vat-highlight">¥${formatNumber(d.total_vat).toFixed(2)}</td><td>¥${formatNumber(d.total_gross).toFixed(2)}</td></tr>`).join('')}
                         </tbody></table>
                         ` : '<p style="text-align:center;color:#999;">暂无数据</p>'}
                     </div>
@@ -122,7 +139,7 @@
                         <h3 style="margin-bottom:15px">🏆 客户消费排行榜</h3>
                         ${customers && customers.length > 0 ? `
                         <table><thead><tr><th>排名</th><th>客户名称</th><th>电话</th><th>订单数</th><th>消费总额</th><th>到店次数</th></tr></thead><tbody>
-                            ${customers.map((c, i) => `<tr><td>${i+1}</td><td>${c.name}</td><td>${c.phone}</td><td>${c.orders_count || 0}</td><td>¥${(c.total_spent || 0).toFixed(2)}</td><td>${c.visit_count || 0}</td></tr>`).join('')}
+                            ${customers.map((c, i) => `<tr><td>${i+1}</td><td>${c.name}</td><td>${c.phone}</td><td>${formatNumber(c.orders_count)}</td><td>¥${formatNumber(c.total_spent).toFixed(2)}</td><td>${formatNumber(c.visit_count)}</td></tr>`).join('')}
                         </tbody></table>
                         ` : '<p style="text-align:center;color:#999;">暂无客户数据</p>'}
                     </div>
@@ -130,7 +147,7 @@
                         <h3 style="margin-bottom:15px">🏆 服务销售排行榜</h3>
                         ${services && services.length > 0 ? `
                         <table><thead><tr><th>服务名称</th><th>单价</th><th>销售次数</th><th>总收入</th></tr></thead><tbody>
-                            ${services.map(s => `<tr><td>${s.name}</td><td>¥${s.price}</td><td>${s.times_sold || 0}</td><td>¥${(s.total_revenue || 0).toFixed(2)}</td></tr>`).join('')}
+                            ${services.map(s => `<tr><td>${s.name}</td><td>¥${formatNumber(s.price)}</td><td>${formatNumber(s.times_sold)}</td><td>¥${formatNumber(s.total_revenue).toFixed(2)}</td></tr>`).join('')}
                         </tbody></table>
                         ` : '<p style="text-align:center;color:#999;">暂无服务数据</p>'}
                     </div>
@@ -145,17 +162,19 @@
             try {
                 const res = await fetch(`${API_BASE}/api/reports/monthly`);
                 const data = await res.json();
+                const summary = data.summary || {};
+                
                 document.getElementById('reportContent').innerHTML = `
                     <div class="stats-grid">
-                        <div class="stat-card"><h3>总订单</h3><div class="stat-value">${data.summary?.total_orders || 0}</div></div>
-                        <div class="stat-card"><h3>总收入</h3><div class="stat-value">¥${(data.summary?.total_revenue || 0).toFixed(2)}</div></div>
-                        <div class="stat-card"><h3>VAT总额</h3><div class="stat-value">¥${(data.summary?.total_vat || 0).toFixed(2)}</div></div>
+                        <div class="stat-card"><h3>总订单</h3><div class="stat-value">${formatNumber(summary.total_orders)}</div></div>
+                        <div class="stat-card"><h3>总收入</h3><div class="stat-value">¥${formatNumber(summary.total_revenue).toFixed(2)}</div></div>
+                        <div class="stat-card"><h3>VAT总额</h3><div class="stat-value">¥${formatNumber(summary.total_vat).toFixed(2)}</div></div>
                     </div>
                     <div class="table-container">
                         <h3 style="margin-bottom:15px">📋 每日明细</h3>
                         ${data.daily && data.daily.length > 0 ? `
                         <table><thead><tr><th>日期</th><th>订单数</th><th>收入</th></tr></thead><tbody>
-                            ${data.daily.map(d => `<tr><td>${d.date}</td><td>${d.orders_count}</td><td>¥${(d.daily_revenue || 0).toFixed(2)}</td></tr>`).join('')}
+                            ${data.daily.map(d => `<tr><td>${d.date}</td><td>${formatNumber(d.orders_count)}</td><td>¥${formatNumber(d.daily_revenue).toFixed(2)}</td></tr>`).join('')}
                         </tbody></table>
                         ` : '<p style="text-align:center;color:#999;">暂无数据</p>'}
                     </div>
@@ -170,18 +189,20 @@
             try {
                 const res = await fetch(`${API_BASE}/api/reports/yearly`);
                 const data = await res.json();
+                const summary = data.summary || {};
+                
                 document.getElementById('reportContent').innerHTML = `
                     <div class="stats-grid">
-                        <div class="stat-card"><h3>年总订单</h3><div class="stat-value">${data.summary?.total_orders || 0}</div></div>
-                        <div class="stat-card"><h3>年总收入</h3><div class="stat-value">¥${(data.summary?.total_revenue || 0).toFixed(2)}</div></div>
-                        <div class="stat-card"><h3>年VAT总额</h3><div class="stat-value">¥${(data.summary?.total_vat || 0).toFixed(2)}</div></div>
-                        <div class="stat-card"><h3>总客户数</h3><div class="stat-value">${data.summary?.total_customers || 0}</div></div>
+                        <div class="stat-card"><h3>年总订单</h3><div class="stat-value">${formatNumber(summary.total_orders)}</div></div>
+                        <div class="stat-card"><h3>年总收入</h3><div class="stat-value">¥${formatNumber(summary.total_revenue).toFixed(2)}</div></div>
+                        <div class="stat-card"><h3>年VAT总额</h3><div class="stat-value">¥${formatNumber(summary.total_vat).toFixed(2)}</div></div>
+                        <div class="stat-card"><h3>总客户数</h3><div class="stat-value">${formatNumber(summary.total_customers)}</div></div>
                     </div>
                     <div class="table-container">
                         <h3 style="margin-bottom:15px">📋 月度明细</h3>
                         ${data.monthly && data.monthly.length > 0 ? `
                         <table><thead><tr><th>月份</th><th>订单数</th><th>收入</th><th>VAT</th></tr></thead><tbody>
-                            ${data.monthly.map(m => `<tr><td>${m.month}月</td><td>${m.orders_count}</td><td>¥${(m.monthly_revenue || 0).toFixed(2)}</td><td>¥${(m.monthly_vat || 0).toFixed(2)}</td></tr>`).join('')}
+                            ${data.monthly.map(m => `<tr><td>${m.month}月</td><td>${formatNumber(m.orders_count)}</td><td>¥${formatNumber(m.monthly_revenue).toFixed(2)}</td><td>¥${formatNumber(m.monthly_vat).toFixed(2)}</td></tr>`).join('')}
                         </tbody></table>
                         ` : '<p style="text-align:center;color:#999;">暂无数据</p>'}
                     </div>
