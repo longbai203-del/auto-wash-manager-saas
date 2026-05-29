@@ -218,3 +218,11 @@ app.listen(PORT, '0.0.0.0', async () => {
   await initDatabase();
   console.log(`🚀 Server running on port ${PORT}`);
 });
+
+// 财务报表
+const reportRoutes = require('./routes/reports');
+app.use('/api/reports', reportRoutes);
+
+// VAT 报表
+const vatRoutes = require('./routes/vat');
+app.use('/api/vat', vatRoutes);

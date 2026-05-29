@@ -1,0 +1,130 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>财务报表 - Auto Wash Manager</title>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f5f7fa}
+        .container{max-width:1400px;margin:0 auto;padding:20px}
+        .header{background:#fff;padding:20px;border-radius:12px;margin-bottom:20px;box-shadow:0 2px 8px rgba(0,0,0,.1)}
+        .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:20px;margin-bottom:30px}
+        .stat-card{background:#fff;padding:20px;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.1)}
+        .stat-card h3{color:#666;font-size:14px;margin-bottom:10px}
+        .stat-value{font-size:32px;font-weight:700;color:#667eea}
+        .stat-unit{font-size:14px;color:#999}
+        .table-container{background:#fff;border-radius:12px;overflow-x:auto;margin-bottom:20px}
+        table{width:100%;border-collapse:collapse}
+        th,td{padding:12px;text-align:left;border-bottom:1px solid #eee}
+        th{background:#f8f9fa;font-weight:600}
+        .nav-links{display:flex;gap:10px;margin-bottom:20px}
+        .nav-link{padding:10px 20px;background:#fff;border-radius:8px;cursor:pointer;transition:all .3s}
+        .nav-link.active{background:#667eea;color:#fff}
+        .date-picker{display:flex;gap:10px;margin-bottom:20px;align-items:center}
+        .date-picker input{padding:8px 12px;border:1px solid #ddd;border-radius:6px}
+        .btn{padding:8px 16px;background:#667eea;color:#fff;border:none;border-radius:6px;cursor:pointer}
+        .vat-highlight{color:#e67e22;font-weight:700}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 财务报表系统</h1>
+            <p>VAT税率: <strong class="vat-highlight">15%</strong> (沙特阿拉伯)</p>
+        </div>
+        
+        <div class="nav-links">
+            <div class="nav-link active" data-report="daily">日报表</div>
+            <div class="nav-link" data-report="monthly">月报表</div>
+            <div class="nav-link" data-report="yearly">年报表</div>
+            <div class="nav-link" data-report="vat">VAT报表</div>
+            <div class="nav-link" data-report="top">排行榜</div>
+        </div>
+        
+        <div id="reportContent"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'https://auto-wash-api.onrender.com';
+        
+        async function loadDaily() {
+            const date = new Date().toISOString().split('T')[0];
+            const res = await fetch(`${API_BASE}/api/reports/daily?date=${date}`);
+            const data = await res.json();
+            
+            document.getElementById('reportContent').innerHTML = `
+                <div class="stats-grid">
+                    <div class="stat-card"><h3>总订单</h3><div class="stat-value">${data.summary.total_orders || 0}</div></div>
+                    <div class="stat-card"><h3>总收入</h3><div class="stat-value">¥${(data.summary.total_revenue || 0).toFixed(2)}</div></div>
+                    <div class="stat-card"><h3>VAT (15%)</h3><div class="stat-value">¥${(data.summary.total_vat || 0).toFixed(2)}</div></div>
+                    <div class="stat-card"><h3>平均订单</h3><div class="stat-value">¥${(data.summary.avg_order_value || 0).toFixed(2)}</div></div>
+                </div>
+                <div class="table-container">
+                    <h3 style="padding:15px">服务销售统计</h3>
+                    <table><thead><tr><th>服务名称</th><th>销售次数</th><th>总销量</th><th>收入</th></tr></thead><tbody>
+                        ${data.services.map(s => `<tr><td>${s.service_name}</td><td>${s.times_sold}</td><td>${s.total_quantity}</td><td>¥${(s.revenue || 0).toFixed(2)}</td></tr>`).join('')}
+                    </tbody></table>
+                </div>
+            `;
+        }
+        
+        async function loadVAT() {
+            const res = await fetch(`${API_BASE}/api/vat/vat-report`);
+            const data = await res.json();
+            
+            document.getElementById('reportContent').innerHTML = `
+                <div class="stats-grid">
+                    <div class="stat-card"><h3>VAT税率</h3><div class="stat-value">${data.vat_rate}%</div></div>
+                    <div class="stat-card"><h3>总发票数</h3><div class="stat-value">${data.summary.total_invoices || 0}</div></div>
+                    <div class="stat-card"><h3>净销售额</h3><div class="stat-value">¥${(data.summary.total_net || 0).toFixed(2)}</div></div>
+                    <div class="stat-card"><h3>VAT金额</h3><div class="stat-value vat-highlight">¥${(data.summary.total_vat || 0).toFixed(2)}</div></div>
+                    <div class="stat-card"><h3>含税总额</h3><div class="stat-value">¥${(data.summary.total_gross || 0).toFixed(2)}</div></div>
+                </div>
+                <div class="table-container">
+                    <h3 style="padding:15px">VAT日报表</h3>
+                    <table><thead><tr><th>日期</th><th>发票数</th><th>净销售额</th><th>VAT</th><th>含税总额</th></tr></thead><tbody>
+                        ${data.daily.map(d => `<tr><td>${d.date}</td><td>${d.invoice_count}</td><td>¥${(d.total_net || 0).toFixed(2)}</td><td class="vat-highlight">¥${(d.total_vat || 0).toFixed(2)}</td><td>¥${(d.total_gross || 0).toFixed(2)}</td></tr>`).join('')}
+                    </tbody></table>
+                </div>
+            `;
+        }
+        
+        async function loadTop() {
+            const [customers, services] = await Promise.all([
+                fetch(`${API_BASE}/api/reports/top-customers`).then(r => r.json()),
+                fetch(`${API_BASE}/api/reports/top-services`).then(r => r.json())
+            ]);
+            
+            document.getElementById('reportContent').innerHTML = `
+                <div class="table-container">
+                    <h3 style="padding:15px">🏆 客户消费排行榜</h3>
+                    <table><thead><tr><th>排名</th><th>客户名称</th><th>电话</th><th>订单数</th><th>消费总额</th><th>到店次数</th></tr></thead><tbody>
+                        ${customers.map((c, i) => `<tr><td>${i+1}</td><td>${c.name}</td><td>${c.phone}</td><td>${c.orders_count || 0}</td><td>¥${(c.total_spent || 0).toFixed(2)}</td><td>${c.visit_count || 0}</td></tr>`).join('')}
+                    </tbody></table>
+                </div>
+                <div class="table-container">
+                    <h3 style="padding:15px">🏆 服务销售排行榜</h3>
+                    <table><thead><tr><th>服务名称</th><th>单价</th><th>销售次数</th><th>总收入</th></tr></thead><tbody>
+                        ${services.map(s => `<tr><td>${s.name}</td><td>¥${s.price}</td><td>${s.times_sold || 0}</td><td>¥${(s.total_revenue || 0).toFixed(2)}</td></tr>`).join('')}
+                    </tbody></table>
+                </div>
+            `;
+        }
+        
+        document.querySelectorAll('.nav-link').forEach(link => {
+            link.addEventListener('click', () => {
+                document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+                link.classList.add('active');
+                const report = link.dataset.report;
+                if (report === 'daily') loadDaily();
+                else if (report === 'vat') loadVAT();
+                else if (report === 'top') loadTop();
+                else loadDaily();
+            });
+        });
+        
+        loadDaily();
+    </script>
+</body>
+</html>
