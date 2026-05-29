@@ -14,8 +14,8 @@ app.use(cors({
 app.use(express.json());
 
 // 认证路由
-const authRoutes = require('./routes/auth'); // Temporarily disabled
-app.use('/api/auth', authRoutes); // Temporarily disabled
+// const authRoutes = require('./routes/auth'); // Temporarily disabled
+// app.use('/api/auth', authRoutes); // Temporarily disabled
 
 // 连接 Supabase 数据库
 const pool = new Pool({
@@ -302,6 +302,7 @@ app.listen(PORT, '0.0.0.0', async () => {
   console.log(`📡 Health: https://auto-wash-api.onrender.com/health`);
   console.log(`💾 Database: Supabase (PostgreSQL)`);
 });
+
 
 
 
