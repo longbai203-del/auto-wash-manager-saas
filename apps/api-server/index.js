@@ -1,4 +1,4 @@
-﻿const express = require('express');
+const express = require('express');
 const cors = require('cors');
 const { Pool } = require('pg');
 
@@ -12,6 +12,10 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.use(express.json());
+
+// 认证路由
+const authRoutes = require('./routes/auth');
+app.use('/api/auth', authRoutes);
 
 // 连接 Supabase 数据库
 const pool = new Pool({
@@ -298,3 +302,4 @@ app.listen(PORT, '0.0.0.0', async () => {
   console.log(`📡 Health: https://auto-wash-api.onrender.com/health`);
   console.log(`💾 Database: Supabase (PostgreSQL)`);
 });
+
