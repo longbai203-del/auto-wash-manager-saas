@@ -1,83 +1,300 @@
 ﻿const express = require('express');
 const cors = require('cors');
-const fs = require('fs');
-const path = require('path');
+const { Pool } = require('pg');
 
 const app = express();
+const PORT = process.env.PORT || 10000;
 
-// 允许所有来源访问（临时解决 CORS）
+// CORS 配置
 app.use(cors({
   origin: '*',
-  credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
-
 app.use(express.json());
 
-const PORT = process.env.PORT || 5000;
+// 连接 Supabase 数据库
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false }
+});
 
-// 数据存储
-let orders = [];
-let customers = [
-  { id: '1', name: '张三', phone: '13800138001', email: 'zhang@example.com', totalSpent: 450, visitCount: 5 },
-  { id: '2', name: '李四', phone: '13800138002', email: 'li@example.com', totalSpent: 230, visitCount: 3 },
-  { id: '3', name: '王五', phone: '13800138003', email: 'wang@example.com', totalSpent: 680, visitCount: 7 }
-];
-
-const services = [
-  { id: '1', name: '基础洗车', price: 30, duration: 30, category: '洗车' },
-  { id: '2', name: '精洗', price: 60, duration: 60, category: '洗车' },
-  { id: '3', name: '打蜡', price: 100, duration: 45, category: '美容' },
-  { id: '4', name: '内饰清洁', price: 150, duration: 90, category: '内饰' }
-];
+// 初始化数据库表
+async function initDatabase() {
+  try {
+    // 创建客户表
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS customers (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(100) NOT NULL,
+        phone VARCHAR(20) UNIQUE NOT NULL,
+        email VARCHAR(100),
+        total_spent DECIMAL DEFAULT 0,
+        visit_count INT DEFAULT 0,
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    
+    // 创建服务表
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS services (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(100) UNIQUE NOT NULL,
+        price DECIMAL NOT NULL,
+        duration INT NOT NULL,
+        category VARCHAR(50),
+        is_active BOOLEAN DEFAULT TRUE
+      )
+    `);
+    
+    // 创建订单表
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS orders (
+        id SERIAL PRIMARY KEY,
+        order_number VARCHAR(50) UNIQUE NOT NULL,
+        customer_id INT REFERENCES customers(id),
+        subtotal DECIMAL,
+        vat_amount DECIMAL,
+        total_amount DECIMAL,
+        status VARCHAR(20) DEFAULT 'pending',
+        notes TEXT,
+        created_at TIMESTAMP DEFAULT NOW(),
+        completed_at TIMESTAMP
+      )
+    `);
+    
+    // 创建订单项表
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS order_items (
+        id SERIAL PRIMARY KEY,
+        order_id INT REFERENCES orders(id),
+        service_id INT REFERENCES services(id),
+        service_name VARCHAR(100),
+        quantity INT,
+        unit_price DECIMAL,
+        total DECIMAL
+      )
+    `);
+    
+    // 检查是否有初始数据
+    const servicesCount = await pool.query('SELECT COUNT(*) FROM services');
+    if (parseInt(servicesCount.rows[0].count) === 0) {
+      // 插入默认服务
+      await pool.query(`
+        INSERT INTO services (name, price, duration, category) VALUES
+        ('基础洗车', 30, 30, '洗车'),
+        ('精洗', 60, 60, '洗车'),
+        ('打蜡', 100, 45, '美容'),
+        ('内饰清洁', 150, 90, '内饰')
+      `);
+      console.log('✅ 默认服务已添加');
+    }
+    
+    const customersCount = await pool.query('SELECT COUNT(*) FROM customers');
+    if (parseInt(customersCount.rows[0].count) === 0) {
+      // 插入默认客户
+      await pool.query(`
+        INSERT INTO customers (name, phone, email) VALUES
+        ('张三', '13800138001', 'zhang@example.com'),
+        ('李四', '13800138002', 'li@example.com'),
+        ('王五', '13800138003', 'wang@example.com')
+      `);
+      console.log('✅ 默认客户已添加');
+    }
+    
+    console.log('✅ 数据库初始化完成');
+  } catch (error) {
+    console.error('数据库初始化失败:', error);
+  }
+}
 
 // API 路由
 app.get('/', (req, res) => {
-  res.json({
-    message: 'Auto Wash Manager API',
-    version: '2.0.0',
-    status: 'running'
-  });
+  res.json({ message: 'Auto Wash Manager API', version: '2.0.0', status: 'running', database: 'Supabase' });
 });
 
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  res.json({ status: 'ok', timestamp: new Date().toISOString(), database: 'connected' });
 });
 
-app.get('/api/services', (req, res) => {
-  res.json(services);
+// 服务列表
+app.get('/api/services', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT id, name, price, duration, category FROM services WHERE is_active = true');
+    res.json(result.rows);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
-app.get('/api/customers', (req, res) => {
-  res.json(customers);
+// 客户列表
+app.get('/api/customers', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT id, name, phone, email, total_spent, visit_count FROM customers ORDER BY id');
+    res.json(result.rows);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
-app.get('/api/orders', (req, res) => {
-  res.json(orders);
+// 添加客户
+app.post('/api/customers', async (req, res) => {
+  const { name, phone, email } = req.body;
+  try {
+    const result = await pool.query(
+      'INSERT INTO customers (name, phone, email) VALUES ($1, $2, $3) RETURNING *',
+      [name, phone, email || '']
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
-app.get('/api/stats', (req, res) => {
-  const today = new Date().toDateString();
-  const todayOrders = orders.filter(o => new Date(o.createdAt).toDateString() === today);
-  res.json({
-    todayOrders: todayOrders.length,
-    totalOrders: orders.length,
-    totalRevenue: orders.reduce((sum, o) => sum + o.totalAmount, 0),
-    pendingOrders: orders.filter(o => o.status === 'pending').length,
-    totalCustomers: customers.length,
-    activeServices: services.length
-  });
+// 订单列表
+app.get('/api/orders', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT o.*, c.name as customer_name,
+        COALESCE(json_agg(json_build_object('service_name', oi.service_name, 'quantity', oi.quantity, 'unit_price', oi.unit_price, 'total', oi.total)) FILTER (WHERE oi.id IS NOT NULL), '[]') as items
+      FROM orders o
+      LEFT JOIN customers c ON o.customer_id = c.id
+      LEFT JOIN order_items oi ON o.id = oi.order_id
+      GROUP BY o.id, c.name
+      ORDER BY o.created_at DESC
+    `);
+    res.json(result.rows);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
-app.get('/api/dashboard', (req, res) => {
-  res.json({
-    recentOrders: orders.slice(0, 10),
-    topCustomers: [...customers].sort((a, b) => b.totalSpent - a.totalSpent).slice(0, 5),
-    servicesPopularity: services.map(s => ({ name: s.name, orders: 0 }))
-  });
+// 创建订单
+app.post('/api/orders', async (req, res) => {
+  const { customerId, items, notes } = req.body;
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    
+    // 获取服务价格
+    let subtotal = 0;
+    const orderItems = [];
+    for (const item of items) {
+      const service = await client.query('SELECT name, price FROM services WHERE id = $1', [item.serviceId]);
+      const total = service.rows[0].price * item.quantity;
+      subtotal += total;
+      orderItems.push({
+        serviceId: item.serviceId,
+        serviceName: service.rows[0].name,
+        quantity: item.quantity,
+        unitPrice: service.rows[0].price,
+        total
+      });
+    }
+    
+    const vatAmount = subtotal * 0.15;
+    const totalAmount = subtotal + vatAmount;
+    const orderNumber = `ORD-${Date.now()}`;
+    
+    // 创建订单
+    const orderResult = await client.query(
+      'INSERT INTO orders (order_number, customer_id, subtotal, vat_amount, total_amount, notes) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+      [orderNumber, customerId, subtotal, vatAmount, totalAmount, notes || '']
+    );
+    
+    // 创建订单项
+    for (const item of orderItems) {
+      await client.query(
+        'INSERT INTO order_items (order_id, service_id, service_name, quantity, unit_price, total) VALUES ($1, $2, $3, $4, $5, $6)',
+        [orderResult.rows[0].id, item.serviceId, item.serviceName, item.quantity, item.unitPrice, item.total]
+      );
+    }
+    
+    // 更新客户统计
+    await client.query('UPDATE customers SET total_spent = total_spent + $1, visit_count = visit_count + 1 WHERE id = $2', [totalAmount, customerId]);
+    
+    await client.query('COMMIT');
+    res.status(201).json(orderResult.rows[0]);
+  } catch (error) {
+    await client.query('ROLLBACK');
+    res.status(500).json({ error: error.message });
+  } finally {
+    client.release();
+  }
 });
 
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running on port ${PORT}`);
+// 更新订单状态
+app.put('/api/orders/:id/status', async (req, res) => {
+  const { status } = req.body;
+  try {
+    await pool.query('UPDATE orders SET status = $1, completed_at = $2 WHERE id = $3', 
+      [status, status === 'completed' ? new Date() : null, req.params.id]);
+    res.json({ id: req.params.id, status });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 统计数据
+app.get('/api/stats', async (req, res) => {
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const [totalOrders, todayOrders, totalRevenue, pendingOrders, totalCustomers, activeServices] = await Promise.all([
+      pool.query('SELECT COUNT(*) FROM orders'),
+      pool.query('SELECT COUNT(*) FROM orders WHERE created_at >= $1', [today]),
+      pool.query('SELECT COALESCE(SUM(total_amount), 0) FROM orders'),
+      pool.query('SELECT COUNT(*) FROM orders WHERE status = $1', ['pending']),
+      pool.query('SELECT COUNT(*) FROM customers'),
+      pool.query('SELECT COUNT(*) FROM services WHERE is_active = true')
+    ]);
+    
+    res.json({
+      todayOrders: parseInt(todayOrders.rows[0].count),
+      totalOrders: parseInt(totalOrders.rows[0].count),
+      totalRevenue: parseFloat(totalRevenue.rows[0].coalesce),
+      pendingOrders: parseInt(pendingOrders.rows[0].count),
+      totalCustomers: parseInt(totalCustomers.rows[0].count),
+      activeServices: parseInt(activeServices.rows[0].count)
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 仪表盘
+app.get('/api/dashboard', async (req, res) => {
+  try {
+    const recentOrders = await pool.query(`
+      SELECT o.order_number, c.name as customer_name, o.total_amount, o.status, o.created_at
+      FROM orders o
+      JOIN customers c ON o.customer_id = c.id
+      ORDER BY o.created_at DESC
+      LIMIT 10
+    `);
+    
+    const topCustomers = await pool.query(`
+      SELECT id, name, phone, total_spent, visit_count
+      FROM customers
+      ORDER BY total_spent DESC
+      LIMIT 5
+    `);
+    
+    res.json({
+      recentOrders: recentOrders.rows,
+      topCustomers: topCustomers.rows,
+      servicesPopularity: []
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 启动服务
+app.listen(PORT, '0.0.0.0', async () => {
+  await initDatabase();
+  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`📡 Health: https://auto-wash-api.onrender.com/health`);
+  console.log(`💾 Database: Supabase (PostgreSQL)`);
 });
