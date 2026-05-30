@@ -2,27 +2,54 @@
 
 services:
   postgres:
-    image: postgres:15
+    image: postgres:15-alpine
+    container_name: auto_wash_postgres
     environment:
-      POSTGRES_DB: auto_wash_saas
+      POSTGRES_DB: auto_wash_prod
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - auto_wash_network
+    restart: unless-stopped
 
-  api:
-    build: .
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: auto_wash_backend
+    environment:
+      DATABASE_URL: postgresql://postgres:${DB_PASSWORD:-postgres}@postgres:5432/auto_wash_prod
+      JWT_SECRET: ${JWT_SECRET:-your-super-secret-key-change-in-production}
+      NODE_ENV: production
+      PORT: 8000
     ports:
-      - "5000:5000"
+      - "8000:8000"
     depends_on:
       - postgres
-    environment:
-      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/auto_wash_saas
-      JWT_SECRET: your-super-secret-jwt-key
-    volumes:
-      - ./logs:/app/logs
+    networks:
+      - auto_wash_network
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: auto_wash_frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - auto_wash_network
+    restart: unless-stopped
 
 volumes:
   postgres_data:
+
+networks:
+  auto_wash_network:
+    driver: bridge

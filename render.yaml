@@ -1,16 +1,56 @@
-services:
+﻿services:
+  # 后端 API 服务
   - type: web
     name: auto-wash-api
-    runtime: node
+    runtime: python
     repo: https://github.com/longbai203-del/auto-wash-manager-saas
     plan: free
     region: frankfurt
     buildCommand: |
-      npm install
-      cd apps/api-server && npm install
-    startCommand: node apps/api-server/index.js
+      cd apps/api-server
+      pip install -r requirements.txt
+    startCommand: |
+      cd apps/api-server
+      uvicorn app.main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: NODE_ENV
         value: production
-      - key: PORT
-        value: 10000
+      - key: DATABASE_URL
+        fromDatabase:
+          name: auto-wash-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CORS_ORIGINS
+        value: https://auto-wash-manager-saas.onrender.com
+
+  # 前端静态站点
+  - type: web
+    name: auto-wash-frontend
+    runtime: static
+    repo: https://github.com/longbai203-del/auto-wash-manager-saas
+    plan: free
+    region: frankfurt
+    buildCommand: |
+      cd apps/admin-web-new
+      npm install
+      npm run build
+    staticPublishPath: ./apps/admin-web-new/dist
+    envVars:
+      - key: VITE_API_URL
+        value: https://auto-wash-api.onrender.com/api
+    headers:
+      - path: /*
+        name: Cache-Control
+        value: no-cache
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+
+  # PostgreSQL 数据库
+  - type: postgresql
+    name: auto-wash-db
+    plan: free
+    region: frankfurt
+    ipAllowList: []

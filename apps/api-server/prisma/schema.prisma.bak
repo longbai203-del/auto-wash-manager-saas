@@ -1,0 +1,66 @@
+﻿generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+// 服务模型
+model Service {
+  id        String   @id @default(cuid())
+  name      String
+  price     Float
+  duration  Int
+  category  String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  
+  orderItems OrderItem[]
+}
+
+// 客户模型
+model Customer {
+  id         String   @id @default(cuid())
+  name       String
+  phone      String   @unique
+  email      String?
+  totalSpent Float    @default(0)
+  visitCount Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  
+  orders     Order[]
+}
+
+// 订单模型
+model Order {
+  id            String      @id @default(cuid())
+  orderNumber   String      @unique
+  customerId    String
+  customer      Customer    @relation(fields: [customerId], references: [id])
+  subtotal      Float
+  vatAmount     Float
+  totalAmount   Float
+  status        String      @default("pending")
+  paymentStatus String      @default("pending")
+  paymentMethod String?
+  notes         String?
+  createdAt     DateTime    @default(now())
+  completedAt   DateTime?
+  
+  items         OrderItem[]
+}
+
+// 订单项目模型
+model OrderItem {
+  id        String  @id @default(cuid())
+  orderId   String
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  serviceId String
+  service   Service @relation(fields: [serviceId], references: [id])
+  quantity  Int
+  unitPrice Float
+  total     Float
+}
